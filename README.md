@@ -1,26 +1,22 @@
-# CAM'S STATS V2.0
+# CAM'S STATS V6.0
 
-React/Vite NFL + NBA sports desk, with ESPN-style editorial layout, NFL/NBA scores and news fetched client-side from ESPN's publicly accessible endpoints, and an illustrative CAM Fantasy Index.
+NFL + NBA sports desk, ESPN-style presentation, and interactive analytical tools.
 
-## Deployment on existing Render Web Service
-Build command: `yarn install && yarn build`
+## Features
+- NFL and NBA scoreboard and news feeds (third-party ESPN endpoints; may be blocked or unavailable)
+- Fantasy rankings with scoring filters (DEMO ONLY; not real projections)
+- NFL/NBA Pro Lab with searchable sample players and comparison charts
+- Scenario-based NFL/NBA game predictor (user-adjustable, not a trained forecast)
+- GM Center with custom roster cap hits, cap-space tracking, and trade calculator
+- CAM Analyst offline rules-based Q&A (NOT connected to an LLM)
+
+## Deploy on existing Render Web Service
+Build command: `npm install && npm run build`
 Start command: `npx vite preview --host 0.0.0.0 --port $PORT`
-The `vite.config.js` file permits `cams-stats.onrender.com` as a preview host.
+Set preview.allowedHosts in vite.config.js for your domain. Static Site is preferred: publish `dist` and use no start command.
 
-## Recommended production deployment
-Render Static Site: build `npm install && npm run build`, publish directory `dist`, root directory blank. Static sites do not need a start command.
+## Local
+`npm install` then `npm run dev`.
 
-## Data disclaimer
-Game scores and headlines are requested from ESPN public endpoints in the visitor's browser and refreshed every 60 seconds; endpoint accessibility and browser CORS policies are outside this project's control. A clear unavailable state appears if the feed cannot be reached. Fantasy rankings, stat leaders, projections and comparisons are demo data, NOT actual or current recommendations. For reliable production live data and fantasy projections, use a licensed provider and backend ingestion.
-
-## Local development
-`npm install`
-`npm run dev`
-
-## Version 2 changes
-- NFL and NBA current scoreboard feeds with loading/failure states
-- NFL and NBA latest news with external story links
-- 60-second scoreboard refresh
-- No fictional scores displayed as current data
-- New editorial story cards and league headlines
-- Render Vite preview allowlist config included
+## Data transparency
+Fantasy rankings, statistical leaders, Pro Lab figures, and projections are sample/demo values. GM contracts and cap limits are manually entered, not official salary data. The predictions page uses a simple what-if calculation and has not been trained or backtested. CAM Analyst uses fixed responses and does not call an AI API. Live score/news calls are attempted directly from the browser and may fail due to CORS or provider changes. Do not use model outputs for wagering or real-world financial decisions.
