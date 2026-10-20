@@ -20,3 +20,6 @@ Set preview.allowedHosts in vite.config.js for your domain. Static Site is prefe
 
 ## Data transparency
 Fantasy rankings, statistical leaders, Pro Lab figures, and projections are sample/demo values. GM contracts and cap limits are manually entered, not official salary data. The predictions page uses a simple what-if calculation and has not been trained or backtested. CAM Analyst uses fixed responses and does not call an AI API. Live score/news calls are attempted directly from the browser and may fail due to CORS or provider changes. Do not use model outputs for wagering or real-world financial decisions.
+
+## Real player data (new)
+The **Real Stats** navigation page fetches current NFL and NBA team rosters and season player statistics directly from ESPN's public, undocumented endpoints. Choose league, team, player, and season. It displays only returned fields and an error if unavailable. This is a live-data integration, not a cached or validated database; CORS and endpoint changes may affect it. Other fantasy rankings, predictions, GM contracts and example leaders remain illustrative. A production-quality CAM fantasy rating requires verified weekly game logs and testing before replacing the examples.
