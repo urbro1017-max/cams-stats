@@ -1,35 +1,26 @@
-# CAM'S STATS
+# CAM'S STATS V2.0
 
-An original ESPN-inspired NFL + NBA website prototype with independent fantasy football rankings, player comparisons, league pages, and responsive design. Built with React and Vite.
+React/Vite NFL + NBA sports desk, with ESPN-style editorial layout, NFL/NBA scores and news fetched client-side from ESPN's publicly accessible endpoints, and an illustrative CAM Fantasy Index.
 
-## Run locally
+## Deployment on existing Render Web Service
+Build command: `yarn install && yarn build`
+Start command: `npx vite preview --host 0.0.0.0 --port $PORT`
+The `vite.config.js` file permits `cams-stats.onrender.com` as a preview host.
 
-1. Install Node.js 20+.
-2. Run `npm install`.
-3. Run `npm run dev` and open the local URL shown.
+## Recommended production deployment
+Render Static Site: build `npm install && npm run build`, publish directory `dist`, root directory blank. Static sites do not need a start command.
 
-## Deploy to Render
+## Data disclaimer
+Game scores and headlines are requested from ESPN public endpoints in the visitor's browser and refreshed every 60 seconds; endpoint accessibility and browser CORS policies are outside this project's control. A clear unavailable state appears if the feed cannot be reached. Fantasy rankings, stat leaders, projections and comparisons are demo data, NOT actual or current recommendations. For reliable production live data and fantasy projections, use a licensed provider and backend ingestion.
 
-Create a **Static Site** from this GitHub repository:
-- Build command: `npm install && npm run build`
-- Publish directory: `dist`
-- Add a rewrite rule `/*` → `/index.html` (status 200) if needed for client-side routing.
+## Local development
+`npm install`
+`npm run dev`
 
-## Important: data status
-
-This is a functional **front-end prototype**. Game scores, stat leaders, fantasy ratings, and projections are **illustrative demo data**, clearly labeled in the UI. They are not live, historical, or reliable fantasy recommendations. The app does not yet use a sports API or server. Player rankings use an illustrative CFI scale; scoring mode changes demonstration point projections.
-
-## Next development steps
-
-- Connect a licensed NFL/NBA data provider with an authenticated server-side proxy; never embed private API keys in the browser.
-- Build a data ingestion and caching pipeline, then populate real scores, rosters, statistics, and injuries.
-- Implement and backtest a documented CFI formula on historical weekly fantasy results.
-- Add accounts, saved favorites, news content, team/player detail pages, and advanced comparisons.
-
-## Fix for "no requirements.txt" on Render
-
-That error means Render tried to deploy this JavaScript project as a **Python** web service. This project does not use Python and does not need `requirements.txt`.
-
-**Recommended:** In Render, select **New > Static Site**, connect your GitHub repo, use build command `npm install && npm run build` and publish directory `dist`. If Render created a Python Web Service, create a new Static Site instead; changing a Python service's build command alone may not fix its runtime.
-
-**Alternative:** Deploy using **New > Blueprint** with the included `render.yaml` in the repository root. This configures the correct static runtime automatically.
+## Version 2 changes
+- NFL and NBA current scoreboard feeds with loading/failure states
+- NFL and NBA latest news with external story links
+- 60-second scoreboard refresh
+- No fictional scores displayed as current data
+- New editorial story cards and league headlines
+- Render Vite preview allowlist config included
