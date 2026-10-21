@@ -41,8 +41,12 @@ function extract(payload, week) {
       const athletes = category.athletes ?? [];
       for (const item of athletes) {
         const athlete = item.athlete ?? item;
-        const pos = athlete.position?.abbreviation ?? athlete.position?.name ?? '';
-        if (!['QB','RB','WR','TE'].includes(pos)) continue;
+        const positionValue = athlete.position ?? item.position ?? athlete.athlete?.position;
+        const posRaw = typeof positionValue === 'string' ? positionValue : (positionValue?.abbreviation ?? positionValue?.name ?? positionValue?.displayName ?? '');
+        const pos = String(posRaw).toUpperCase();
+        // ESPN summary box scores frequently omit position on athlete records.
+        // Keep offensive contributors rather than silently discarding every athlete.
+        if (pos && !['QB','RB','WR','TE'].includes(pos)) continue;
         const id = String(athlete.id ?? '');
         if (!id) continue;
         let row = byId.get(id);
@@ -66,7 +70,10 @@ function extract(payload, week) {
         }
       }
     }
-    result.push(...byId.values());
+    // Exclude defenders with no fantasy-relevant offensive statistics.
+    // Unknown positions are retained and labeled accurately instead of guessed.
+    result.push(...[...byId.values()].filter(r => Object.keys(r.stats).some(k =>
+      ['passingYards','passingTouchdowns','rushingYards','rushingTouchdowns','receivingYards','receivingTouchdowns','receptions'].includes(k))));
   }
   return { rows: result.filter(p=>Object.keys(p.stats).length>0), diagnostics: {
     teamCount:teams.length, categories:teams.flatMap(t=>(t.statistics??[]).map(s=>({name:s.name,keys:s.keys,labels:s.labels,athletes:s.athletes?.length}))).slice(0,6),
@@ -117,7 +124,9 @@ async function main() {
   if (diagnostics.length) console.error('Sample parsing diagnostics:',JSON.stringify(diagnostics,null,2));
   if (!all.size) throw Error('No player game statistics parsed. Review diagnostic boxKeys/categories above; ESPN may have changed its API. No fictional dataset will be published.');
   if (failures.length && process.env.ALLOW_PARTIAL_DATA !== '1') throw Error(`${failures.length}/${events.length} games missing parsable stats. Refusing incomplete rankings. Inspect diagnostics; ALLOW_PARTIAL_DATA=1 explicitly permits partial results.`);
-  const players=[...all.values()].map(p=>({...p,games:p.games.sort((a,b)=>a.week-b.week)}));
+  const players=[...all.values()].map(p=>({...p,position:p.position||'UNKNOWN',games:p.games.sort((a,b)=>a.week-b.week)}));
+  const unknownPositions=players.filter(p=>p.position==='UNKNOWN').length;
+  if(unknownPositions) console.warn(`${unknownPositions} offensive players have no position in ESPN box scores; displayed as UNKNOWN, not guessed.`);
   const out={season,completeness:{expectedCompletedGames:events.length,processedGames:processed,failedGames:failures.length,failedEventIds:failures},source:'ESPN NFL box scores',generatedAt:new Date().toISOString(),gamesCollected:processed,players,warning:failures.length?`${failures.length} completed games are missing; rankings incomplete.`:''};
   await fs.mkdir('public',{recursive:true});
   await fs.writeFile('public/fantasy-data.json',JSON.stringify(out));
