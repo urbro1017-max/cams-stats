@@ -1,12 +1,126 @@
 import fs from 'node:fs/promises';
-const season=Number(process.env.FANTASY_SEASON||new Date().getFullYear());
-const base='https://site.api.espn.com/apis/site/v2/sports/football/nfl';
-const headers={'User-Agent':'CamsStats/1.0'};
-async function get(url){const r=await fetch(url,{headers,signal:AbortSignal.timeout(18000)});if(!r.ok)throw Error(`${r.status} ${url}`);return r.json()}
-const statMap={passingYards:'passingYards',passingTouchdowns:'passingTouchdowns',interceptions:'interceptions',rushingYards:'rushingYards',rushingTouchdowns:'rushingTouchdowns',receivingYards:'receivingYards',receivingTouchdowns:'receivingTouchdowns',receptions:'receptions',fumblesLost:'fumblesLost',twoPointConversions:'twoPointConversions'};
-const aliases={passYds:'passingYards',passTD:'passingTouchdowns',int:'interceptions',rushYds:'rushingYards',rushTD:'rushingTouchdowns',recYds:'receivingYards',recTD:'receivingTouchdowns',rec:'receptions',fumblesLost:'fumblesLost',twoPt:'twoPointConversions'};
-function extract(summary,week){const result=[];const players=summary.boxscore?.players||[];for(const team of players){const abbr=team.team?.abbreviation||'';const byId=new Map();for(const category of team.statistics||[]){const keys=category.keys||[];const labels=category.labels||[];for(const athlete of category.athletes||[]){const a=athlete.athlete||{};const pos=a.position?.abbreviation;if(!['QB','RB','WR','TE'].includes(pos))continue;const id=String(a.id||'');if(!id)continue;let entry=byId.get(id);if(!entry){entry={id,name:a.displayName||a.fullName||'Unknown',position:pos,team:abbr,headshot:a.headshot?.href||'',stats:{},week};byId.set(id,entry)}const values=athlete.stats||[];for(let i=0;i<values.length;i++){const key=statMap[keys[i]]||aliases[keys[i]]||aliases[labels[i]];if(key&&Number.isFinite(Number(values[i])))entry.stats[key]=Number(values[i])}}}result.push(...byId.values())}return result}
-async function main(){const scoreboard=await get(`${base}/scoreboard?dates=${season}&seasontype=2&limit=350`);const events=(scoreboard.events||[]).filter(e=>e.status?.type?.completed);
-console.log(`Found ${events.length} completed regular-season events for ${season}`);if(!events.length)throw Error('No completed regular-season games found');const all=new Map();let collected=0;const failures=[];for(let i=0;i<events.length;i+=8){await Promise.all(events.slice(i,i+8).map(async event=>{try{const summary=await get(`${base}/summary?event=${event.id}`);const week=Number(event.week?.number||summary.header?.competitions?.[0]?.week?.number||0);const rows=extract(summary,week);if(!rows.length)return;collected++;for(const row of rows){let p=all.get(row.id);if(!p){p={id:row.id,name:row.name,position:row.position,team:row.team,headshot:row.headshot,games:[]};all.set(row.id,p)}p.team=row.team;p.games.push({eventId:event.id,week:row.week,stats:row.stats})}}catch(e){failures.push(String(event.id));console.warn(`Skipped game ${event.id}: ${e.message}`)}}))}const players=[...all.values()].filter(p=>p.games.length).map(p=>({...p,games:p.games.sort((a,b)=>a.week-b.week)}));if(!players.length)throw Error('No parsable player box scores; refusing to publish empty/fake rankings');if(failures.length && process.env.ALLOW_PARTIAL_DATA!=='1')throw Error(`${failures.length} of ${events.length} games failed. Refusing to publish incomplete rankings; set ALLOW_PARTIAL_DATA=1 to explicitly allow partial data.`);
-const out={season,completeness:{expectedCompletedGames:events.length,processedGames:collected,failedGames:failures.length,failedEventIds:failures},source:'ESPN NFL game box scores',generatedAt:new Date().toISOString(),gamesCollected:collected,players,warning:collected<events.length?`${events.length-collected} completed games were unavailable and are excluded.`:''};await fs.mkdir('public',{recursive:true});await fs.writeFile('public/fantasy-data.json',JSON.stringify(out));console.log(`Saved ${players.length} athletes from ${collected}/${events.length} games`)}
+
+const season = Number(process.env.FANTASY_SEASON || new Date().getFullYear());
+const root = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
+const fallbackRoot = 'https://site.web.api.espn.com/apis/common/v3/sports/football/nfl';
+const timeout = Number(process.env.DATA_TIMEOUT_MS || 20000);
+async function json(url) {
+  const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(timeout) });
+  if (!response.ok) throw new Error(`HTTP ${response.status}: ${url}`);
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('json')) throw new Error(`Non-JSON response: ${url}`);
+  return response.json();
+}
+const names = {
+  passingyards:'passingYards', passingtouchdowns:'passingTouchdowns', interceptions:'interceptions',
+  rushingyards:'rushingYards', rushingtouchdowns:'rushingTouchdowns',
+  receivingyards:'receivingYards', receivingtouchdowns:'receivingTouchdowns',
+  receptions:'receptions', fumbleslost:'fumblesLost', twopointconversions:'twoPointConversions',
+  passyds:'passingYards', passtd:'passingTouchdowns', rushyds:'rushingYards',
+  rushtd:'rushingTouchdowns', recyds:'receivingYards', rectd:'receivingTouchdowns',
+  rec:'receptions', int:'interceptions', twoPt:'twoPointConversions'
+};
+function norm(s) { return String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+const shortNames = Object.fromEntries(Object.entries(names).map(([k,v])=>[norm(k),v]));
+function numeric(v) {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v !== 'string') return null;
+  const trimmed = v.trim().replaceAll(',','');
+  if (!/^[-+]?\d+(\.\d+)?$/.test(trimmed)) return null;
+  return Number(trimmed);
+}
+function extract(payload, week) {
+  const box = payload?.boxscore ?? payload?.gamepackage?.boxscore ?? {};
+  const teams = box.players ?? [];
+  const result = [];
+  for (const team of teams) {
+    const byId = new Map();
+    for (const category of team.statistics ?? []) {
+      const keys = category.keys ?? [];
+      const labels = category.labels ?? [];
+      const athletes = category.athletes ?? [];
+      for (const item of athletes) {
+        const athlete = item.athlete ?? item;
+        const pos = athlete.position?.abbreviation ?? athlete.position?.name ?? '';
+        if (!['QB','RB','WR','TE'].includes(pos)) continue;
+        const id = String(athlete.id ?? '');
+        if (!id) continue;
+        let row = byId.get(id);
+        if (!row) {
+          row = { id, name: athlete.displayName ?? athlete.fullName ?? 'Unknown', position:pos,
+            team:team.team?.abbreviation ?? '', headshot:athlete.headshot?.href ?? '', week, stats:{} };
+          byId.set(id,row);
+        }
+        const values = item.stats ?? item.statistics ?? [];
+        if (Array.isArray(values)) {
+          for (let i=0;i<values.length;i++) {
+            const key = shortNames[norm(keys[i])] ?? shortNames[norm(labels[i])];
+            const value = numeric(values[i]);
+            if (key && value !== null) row.stats[key] = value;
+          }
+        } else if (values && typeof values === 'object') {
+          for (const [raw, value] of Object.entries(values)) {
+            const key = shortNames[norm(raw)]; const n = numeric(value);
+            if (key && n !== null) row.stats[key] = n;
+          }
+        }
+      }
+    }
+    result.push(...byId.values());
+  }
+  return { rows: result.filter(p=>Object.keys(p.stats).length>0), diagnostics: {
+    teamCount:teams.length, categories:teams.flatMap(t=>(t.statistics??[]).map(s=>({name:s.name,keys:s.keys,labels:s.labels,athletes:s.athletes?.length}))).slice(0,6),
+    boxKeys:Object.keys(box), topKeys:Object.keys(payload??{}).slice(0,20)
+  }};
+}
+async function summary(eventId) {
+  const urls = [
+    `${root}/summary?event=${encodeURIComponent(eventId)}`,
+    `${fallbackRoot}/summary?event=${encodeURIComponent(eventId)}&region=us&lang=en&contentorigin=espn`
+  ];
+  let last;
+  for (const url of urls) {
+    try { const data=await json(url); if ((data.boxscore?.players??data.gamepackage?.boxscore?.players??[]).length) return data; last=data; }
+    catch (e) { last=e; }
+  }
+  if (last instanceof Error) throw last;
+  return last;
+}
+async function main() {
+  const schedule = await json(`${root}/scoreboard?dates=${season}&seasontype=2&limit=350`);
+  const events = (schedule.events ?? []).filter(e=>e.status?.type?.completed && e.season?.type !== 3);
+  console.log(`Found ${events.length} completed regular-season events for ${season}`);
+  if (!events.length) throw Error('No completed games; check FANTASY_SEASON and provider schedule');
+  const all = new Map(), failures=[], diagnostics=[];
+  let processed=0;
+  for (let i=0;i<events.length;i+=5) {
+    await Promise.all(events.slice(i,i+5).map(async event=>{
+      try {
+        const data=await summary(event.id);
+        const week=Number(event.week?.number ?? data.header?.competitions?.[0]?.week?.number ?? 0);
+        const parsed=extract(data,week);
+        if (!parsed.rows.length) {
+          failures.push(String(event.id));
+          if (diagnostics.length<3) diagnostics.push({eventId:event.id,...parsed.diagnostics});
+          return;
+        }
+        processed++;
+        for (const row of parsed.rows) {
+          let player=all.get(row.id);
+          if (!player) { player={id:row.id,name:row.name,position:row.position,team:row.team,headshot:row.headshot,games:[]}; all.set(row.id,player); }
+          player.team=row.team;
+          player.games.push({eventId:String(event.id),week:row.week,stats:row.stats});
+        }
+      } catch(e) { failures.push(String(event.id)); if(diagnostics.length<3) diagnostics.push({eventId:event.id,error:e.message}); }
+    }));
+  }
+  if (diagnostics.length) console.error('Sample parsing diagnostics:',JSON.stringify(diagnostics,null,2));
+  if (!all.size) throw Error('No player game statistics parsed. Review diagnostic boxKeys/categories above; ESPN may have changed its API. No fictional dataset will be published.');
+  if (failures.length && process.env.ALLOW_PARTIAL_DATA !== '1') throw Error(`${failures.length}/${events.length} games missing parsable stats. Refusing incomplete rankings. Inspect diagnostics; ALLOW_PARTIAL_DATA=1 explicitly permits partial results.`);
+  const players=[...all.values()].map(p=>({...p,games:p.games.sort((a,b)=>a.week-b.week)}));
+  const out={season,completeness:{expectedCompletedGames:events.length,processedGames:processed,failedGames:failures.length,failedEventIds:failures},source:'ESPN NFL box scores',generatedAt:new Date().toISOString(),gamesCollected:processed,players,warning:failures.length?`${failures.length} completed games are missing; rankings incomplete.`:''};
+  await fs.mkdir('public',{recursive:true});
+  await fs.writeFile('public/fantasy-data.json',JSON.stringify(out));
+  console.log(`Published ${players.length} players from ${processed}/${events.length} games`);
+}
 main().catch(e=>{console.error('Fantasy refresh failed:',e.message);process.exitCode=1});
