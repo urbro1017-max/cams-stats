@@ -58,13 +58,13 @@ function extract(payload, week) {
         const values = item.stats ?? item.statistics ?? [];
         if (Array.isArray(values)) {
           for (let i=0;i<values.length;i++) {
-            const key = shortNames[norm(keys[i])] ?? shortNames[norm(labels[i])];
+            const key = (category.name === 'interceptions' || category.name === 'defensive') ? null : (shortNames[norm(keys[i])] ?? shortNames[norm(labels[i])]);
             const value = numeric(values[i]);
             if (key && value !== null) row.stats[key] = value;
           }
         } else if (values && typeof values === 'object') {
           for (const [raw, value] of Object.entries(values)) {
-            const key = shortNames[norm(raw)]; const n = numeric(value);
+            const key = (category.name === 'interceptions' || category.name === 'defensive') ? null : shortNames[norm(raw)]; const n = numeric(value);
             if (key && n !== null) row.stats[key] = n;
           }
         }
@@ -92,6 +92,29 @@ async function summary(eventId) {
   }
   if (last instanceof Error) throw last;
   return last;
+}
+async function rosterPositions() {
+  // Match verified ESPN athlete IDs to positions using official team roster responses.
+  // Do not infer a position from game usage or statistics.
+  const result = new Map();
+  const teamsData = await json(`${root}/teams?limit=100`);
+  const teams = (teamsData.sports?.[0]?.leagues?.[0]?.teams ?? []).map(t => t.team).filter(Boolean);
+  let failures = 0;
+  for (let i=0;i<teams.length;i+=6) {
+    await Promise.all(teams.slice(i,i+6).map(async team => {
+      try {
+        const data = await json(`${root}/teams/${team.id}/roster`);
+        for (const entry of data.athletes ?? []) {
+          for (const a of (Array.isArray(entry.items) ? entry.items : [entry])) {
+            const pos = a.position?.abbreviation?.toUpperCase();
+            if (a.id && pos) result.set(String(a.id), {position:pos,team:team.abbreviation,headshot:a.headshot?.href||''});
+          }
+        }
+      } catch(e) { failures++; console.warn(`Roster unavailable for ${team.abbreviation}: ${e.message}`); }
+    }));
+  }
+  console.log(`Roster lookup: ${result.size} athlete IDs across ${teams.length-failures}/${teams.length} teams`);
+  return {result, failures, total:teams.length};
 }
 async function main() {
   const schedule = await json(`${root}/scoreboard?dates=${season}&seasontype=2&limit=350`);
@@ -124,10 +147,16 @@ async function main() {
   if (diagnostics.length) console.error('Sample parsing diagnostics:',JSON.stringify(diagnostics,null,2));
   if (!all.size) throw Error('No player game statistics parsed. Review diagnostic boxKeys/categories above; ESPN may have changed its API. No fictional dataset will be published.');
   if (failures.length && process.env.ALLOW_PARTIAL_DATA !== '1') throw Error(`${failures.length}/${events.length} games missing parsable stats. Refusing incomplete rankings. Inspect diagnostics; ALLOW_PARTIAL_DATA=1 explicitly permits partial results.`);
-  const players=[...all.values()].map(p=>({...p,position:p.position||'UNKNOWN',games:p.games.sort((a,b)=>a.week-b.week)}));
+  let positions = new Map(), rosterFailures=0, rosterTeams=0;
+  try { const roster=await rosterPositions(); positions=roster.result; rosterFailures=roster.failures; rosterTeams=roster.total; }
+  catch(e) { console.warn(`Roster enrichment unavailable: ${e.message}`); }
+  const players=[...all.values()].map(p=>{
+    const verified=positions.get(p.id);
+    return {...p,position:verified?.position||p.position||'UNKNOWN',team:verified?.team||p.team,headshot:verified?.headshot||p.headshot,games:p.games.sort((a,b)=>a.week-b.week)};
+  });
   const unknownPositions=players.filter(p=>p.position==='UNKNOWN').length;
   if(unknownPositions) console.warn(`${unknownPositions} offensive players have no position in ESPN box scores; displayed as UNKNOWN, not guessed.`);
-  const out={season,completeness:{expectedCompletedGames:events.length,processedGames:processed,failedGames:failures.length,failedEventIds:failures},source:'ESPN NFL box scores',generatedAt:new Date().toISOString(),gamesCollected:processed,players,warning:failures.length?`${failures.length} completed games are missing; rankings incomplete.`:''};
+  const out={season,completeness:{expectedCompletedGames:events.length,processedGames:processed,failedGames:failures.length,failedEventIds:failures,rosterTeams,rosterFailures,unknownPositions},source:'ESPN NFL box scores',generatedAt:new Date().toISOString(),gamesCollected:processed,players,warning:failures.length?`${failures.length} completed games are missing; rankings incomplete.`:''};
   await fs.mkdir('public',{recursive:true});
   await fs.writeFile('public/fantasy-data.json',JSON.stringify(out));
   console.log(`Published ${players.length} players from ${processed}/${events.length} games`);
