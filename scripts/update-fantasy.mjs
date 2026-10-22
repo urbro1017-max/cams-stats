@@ -154,11 +154,17 @@ async function main() {
     const verified=positions.get(p.id);
     return {...p,position:verified?.position||p.position||'UNKNOWN',team:verified?.team||p.team,headshot:verified?.headshot||p.headshot,games:p.games.sort((a,b)=>a.week-b.week)};
   });
-  const unknownPositions=players.filter(p=>p.position==='UNKNOWN').length;
+  // ESPN rosters include positions beyond QB/RB/WR/TE (FB, OL, DB, etc.).
+  // Do not mislabel them UNKNOWN or let them invalidate the entire dataset.
+  const eligible = new Set(['QB','RB','WR','TE','UNKNOWN']);
+  const excluded = players.filter(p => !eligible.has(p.position));
+  const fantasyPlayers = players.filter(p => eligible.has(p.position));
+  console.log(`Excluded ${excluded.length} verified non-QB/RB/WR/TE players from offensive fantasy rankings (examples: ${[...new Set(excluded.map(p=>p.position))].slice(0,12).join(', ')})`);
+  const unknownPositions=fantasyPlayers.filter(p=>p.position==='UNKNOWN').length;
   if(unknownPositions) console.warn(`${unknownPositions} offensive players have no position in ESPN box scores; displayed as UNKNOWN, not guessed.`);
-  const out={season,completeness:{expectedCompletedGames:events.length,processedGames:processed,failedGames:failures.length,failedEventIds:failures,rosterTeams,rosterFailures,unknownPositions},source:'ESPN NFL box scores',generatedAt:new Date().toISOString(),gamesCollected:processed,players,warning:failures.length?`${failures.length} completed games are missing; rankings incomplete.`:''};
+  const out={season,completeness:{expectedCompletedGames:events.length,processedGames:processed,failedGames:failures.length,failedEventIds:failures,rosterTeams,rosterFailures,unknownPositions,excludedNonFantasyPlayers:excluded.length},source:'ESPN NFL box scores',generatedAt:new Date().toISOString(),gamesCollected:processed,players:fantasyPlayers,warning:failures.length?`${failures.length} completed games are missing; rankings incomplete.`:''};
   await fs.mkdir('public',{recursive:true});
   await fs.writeFile('public/fantasy-data.json',JSON.stringify(out));
-  console.log(`Published ${players.length} players from ${processed}/${events.length} games`);
+  console.log(`Published ${fantasyPlayers.length} fantasy-eligible players from ${processed}/${events.length} games`);
 }
 main().catch(e=>{console.error('Fantasy refresh failed:',e.message);process.exitCode=1});
