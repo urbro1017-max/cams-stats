@@ -3,7 +3,7 @@ import {ResponsiveContainer,LineChart,Line,CartesianGrid,XAxis,YAxis,Tooltip,Bar
 import './upgrade.css';
 const base={NFL:'football/nfl',NBA:'basketball/nba'};
 async function get(url){const r=await fetch(url);if(!r.ok)throw Error(`Data provider returned ${r.status}`);return r.json()}
-const api=(league,path)=>`https://site.api.espn.com/apis/site/v2/sports/${base[league]}/${path}`;
+const api=(league,path)=>`/api/espn/site/apis/site/v2/sports/${base[league]}/${path}`;
 function teamFrom(c){return c?.team?.displayName||c?.team?.name||'Team'}
 export function GameReview({league,id,onClose}){
  const [data,setData]=useState(null),[error,setError]=useState('');
