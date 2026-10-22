@@ -11,10 +11,15 @@ const send=(res,status,body,type='application/json; charset=utf-8')=>{res.writeH
 http.createServer(async(req,res)=>{
  try{
   const u=new URL(req.url,'http://localhost');
+  if(u.pathname==='/api/health'){
+   let fantasy={available:false};
+   try { const f=JSON.parse(await readFile(path.join(root,'fantasy-data.json'),'utf8')); fantasy={available:true,season:f.season,players:f.players?.length||0,gamesCollected:f.gamesCollected||0,generatedAt:f.generatedAt,failedGames:f.completeness?.failedGames||0,unknownPositions:f.completeness?.unknownPositions||0}; } catch {}
+   return send(res,200,JSON.stringify({ok:true,service:'cams-stats',fantasy}));
+  }
   if(u.pathname.startsWith('/api/espn/')){
    if(req.method!=='GET')return send(res,405,JSON.stringify({error:'Method not allowed'}));
    const parts=u.pathname.match(/^\/api\/espn\/(site|web)\/(.+)$/);
-   if(!parts||!/^apis\/(site\/v2|common\/v3)\/sports\/(football\/nfl|basketball\/nba)\//.test(parts[2]))return send(res,400,JSON.stringify({error:'Unsupported sports API route'}));
+   if(!parts||!/^apis\/(site\/v2|common\/v3)\/sports\/(football\/nfl|basketball\/nba)\/[a-zA-Z0-9/_-]+$/.test(parts[2]) || (parts[1]==='site'&&!parts[2].startsWith('apis/site/v2/')) || (parts[1]==='web'&&!parts[2].startsWith('apis/common/v3/')))return send(res,400,JSON.stringify({error:'Unsupported sports API route'}));
    const host=parts[1]==='web'?'site.web.api.espn.com':'site.api.espn.com';
    const target=`https://${host}/${parts[2]}${u.search}`;
    const cached=cache.get(target);if(cached&&cached.until>Date.now()){res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','X-Cache':'HIT'});return res.end(cached.body)}

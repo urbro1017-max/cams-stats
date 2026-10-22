@@ -10,7 +10,8 @@
     "data:update": "node scripts/update-fantasy.mjs && node scripts/validate-data.mjs",
     "data:check": "node scripts/validate-data.mjs",
     "build:with-data": "npm run data:update && npm run build",
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "test": "node scripts/smoke-test.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

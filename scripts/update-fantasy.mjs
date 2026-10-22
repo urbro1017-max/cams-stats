@@ -150,6 +150,13 @@ async function main() {
   let positions = new Map(), rosterFailures=0, rosterTeams=0;
   try { const roster=await rosterPositions(); positions=roster.result; rosterFailures=roster.failures; rosterTeams=roster.total; }
   catch(e) { console.warn(`Roster enrichment unavailable: ${e.message}`); }
+  for(const player of all.values()) {
+    const seen=new Set();
+    for(const game of player.games) {
+      if(seen.has(game.eventId)) throw Error(`Duplicate player-game: ${player.id} event ${game.eventId}`);
+      seen.add(game.eventId);
+    }
+  }
   const players=[...all.values()].map(p=>{
     const verified=positions.get(p.id);
     return {...p,position:verified?.position||p.position||'UNKNOWN',team:verified?.team||p.team,headshot:verified?.headshot||p.headshot,games:p.games.sort((a,b)=>a.week-b.week)};
@@ -164,7 +171,9 @@ async function main() {
   if(unknownPositions) console.warn(`${unknownPositions} offensive players have no position in ESPN box scores; displayed as UNKNOWN, not guessed.`);
   const out={season,completeness:{expectedCompletedGames:events.length,processedGames:processed,failedGames:failures.length,failedEventIds:failures,rosterTeams,rosterFailures,unknownPositions,excludedNonFantasyPlayers:excluded.length},source:'ESPN NFL box scores',generatedAt:new Date().toISOString(),gamesCollected:processed,players:fantasyPlayers,warning:failures.length?`${failures.length} completed games are missing; rankings incomplete.`:''};
   await fs.mkdir('public',{recursive:true});
-  await fs.writeFile('public/fantasy-data.json',JSON.stringify(out));
+  const tmp='public/fantasy-data.json.tmp';
+  await fs.writeFile(tmp,JSON.stringify(out));
+  await fs.rename(tmp,'public/fantasy-data.json');
   console.log(`Published ${fantasyPlayers.length} fantasy-eligible players from ${processed}/${events.length} games`);
 }
 main().catch(e=>{console.error('Fantasy refresh failed:',e.message);process.exitCode=1});
