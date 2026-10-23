@@ -2,6 +2,6 @@ services:
   - type: web
     name: cams-stats
     runtime: node
-    buildCommand: npm install && npm run build:with-data
+    buildCommand: npm install && npm run build
     startCommand: npm start
-    healthCheckPath: /
+    healthCheckPath: /api/health

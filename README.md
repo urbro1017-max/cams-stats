@@ -1,25 +1,28 @@
-# CAM'S STATS V6.0
+# CAM'S STATS — Fresh Build v3
 
-NFL + NBA sports desk, ESPN-style presentation, and interactive analytical tools.
+A **new**, dependency-free Node.js sports dashboard. This intentionally replaces the old React/Vite frontend and its overlapping styles and routes.
+
+## Render
+Create a **Node Web Service** connected to `urbro1017-max/cams-stats`.
+
+- Build: `npm install && npm run build`
+- Start: `npm start`
+- Health: `/api/health`
+- Node 20+
+
+**Replace all old repository contents** with the files from this folder. Do not nest this folder inside the repository. Do not delete the repository or its history. `npm run build:with-data` is no longer used.
 
 ## Features
-- NFL and NBA scoreboard and news feeds (third-party ESPN endpoints; may be blocked or unavailable)
-- Fantasy rankings with scoring filters (DEMO ONLY; not real projections)
-- NFL/NBA Pro Lab with searchable sample players and comparison charts
-- Scenario-based NFL/NBA game predictor (user-adjustable, not a trained forecast)
-- GM Center with custom roster cap hits, cap-space tracking, and trade calculator
-- CAM Analyst offline rules-based Q&A (NOT connected to an LLM)
+- NFL and NBA daily scoreboards with team logos, live/final states, date navigation, and historical game details.
+- Completed game box scores, scoring plays, and play-by-play when supplied by ESPN.
+- Team directories with logos.
+- NBA daily fantasy scoring from completed-game box scores, with scoring formula shown.
+- Honest NFL fantasy limitation: game box scores are available, but season-wide fantasy rankings are **not** implemented in this clean rebuild.
+- API proxy with validation, timeout, caching and stale-data fallback.
+- No fabricated scores or player stats.
 
-## Deploy on existing Render Web Service
-Build command: `npm install && npm run build`
-Start command: `npx vite preview --host 0.0.0.0 --port $PORT`
-Set preview.allowedHosts in vite.config.js for your domain. Static Site is preferred: publish `dist` and use no start command.
+## Data source
+Uses ESPN's unofficial public site API, which can change, rate-limit, or be unavailable. Historical coverage depends on provider availability. No guarantee of live uptime or complete archives. No official league affiliation.
 
-## Local
-`npm install` then `npm run dev`.
-
-## Data transparency
-Fantasy rankings, statistical leaders, Pro Lab figures, and projections are sample/demo values. GM contracts and cap limits are manually entered, not official salary data. The predictions page uses a simple what-if calculation and has not been trained or backtested. CAM Analyst uses fixed responses and does not call an AI API. Live score/news calls are attempted directly from the browser and may fail due to CORS or provider changes. Do not use model outputs for wagering or real-world financial decisions.
-
-## Real player data (new)
-The **Real Stats** navigation page fetches current NFL and NBA team rosters and season player statistics directly from ESPN's public, undocumented endpoints. Choose league, team, player, and season. It displays only returned fields and an error if unavailable. This is a live-data integration, not a cached or validated database; CORS and endpoint changes may affect it. Other fantasy rankings, predictions, GM contracts and example leaders remain illustrative. A production-quality CAM fantasy rating requires verified weekly game logs and testing before replacing the examples.
+## Run
+`npm start` then visit http://localhost:3000. `npm test` for API tests.
