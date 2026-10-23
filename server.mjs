@@ -1,3 +1,4 @@
+import {nbaFantasy} from './nba-fantasy.mjs';
 import http from 'node:http';
 import {readFile, stat} from 'node:fs/promises';
 import path from 'node:path';
@@ -11,6 +12,15 @@ const send=(res,status,body,type='application/json; charset=utf-8')=>{res.writeH
 http.createServer(async(req,res)=>{
  try{
   const u=new URL(req.url,'http://localhost');
+  if(u.pathname==='/api/fantasy/nba'){
+   if(req.method!=='GET')return send(res,405,JSON.stringify({error:'Method not allowed'}));
+   const date=u.searchParams.get('date')||new Date().toISOString().slice(0,10).replaceAll('-','');
+   if(!/^\d{8}$/.test(date))return send(res,400,JSON.stringify({error:'Date must be YYYYMMDD'}));
+   const key='nba-fantasy:'+date,hit=cache.get(key);
+   if(hit&&hit.until>Date.now())return send(res,200,hit.body);
+   try{const result=await nbaFantasy(date);const body=JSON.stringify(result);cache.set(key,{body,until:Date.now()+300000});return send(res,200,body)}
+   catch(e){return send(res,502,JSON.stringify({error:'NBA fantasy data unavailable',detail:e.message}))}
+  }
   if(u.pathname==='/api/health'){
    let fantasy={available:false};
    try { const f=JSON.parse(await readFile(path.join(root,'fantasy-data.json'),'utf8')); fantasy={available:true,season:f.season,players:f.players?.length||0,gamesCollected:f.gamesCollected||0,generatedAt:f.generatedAt,failedGames:f.completeness?.failedGames||0,unknownPositions:f.completeness?.unknownPositions||0}; } catch {}
