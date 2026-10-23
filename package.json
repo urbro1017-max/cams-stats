@@ -11,7 +11,8 @@
     "data:check": "node scripts/validate-data.mjs",
     "build:with-data": "npm run data:update && npm run build",
     "start": "node server.mjs",
-    "test": "node scripts/smoke-test.mjs"
+    "test": "node scripts/smoke-test.mjs",
+    "build:offline": "vite build"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

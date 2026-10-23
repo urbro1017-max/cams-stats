@@ -1,0 +1,14 @@
+/* CAM'S STATS — unified high-contrast design system */
+:root{--cs-bg:#080c14;--cs-surface:#111927;--cs-edge:rgba(174,196,227,.16);--cs-accent:#75b8ff;--cs-text:#f4f7fd}
+body.darkMode{background:var(--cs-bg)!important;color:var(--cs-text)}
+body.darkMode .card,body.darkMode .csScoreGame,body.darkMode .newsCard,body.darkMode .explore,body.darkMode .reviewPanel{background:linear-gradient(145deg,#141e2d,#0c1320)!important;border:1px solid var(--cs-edge)!important;box-shadow:0 14px 35px rgba(0,0,0,.22)}
+.csScoreGame{transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease!important;border-radius:18px!important;text-align:left}
+.csScoreGame:hover{transform:translateY(-3px);border-color:rgba(117,184,255,.65)!important;box-shadow:0 16px 38px rgba(0,0,0,.2)}
+.csScoreGame:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #75b8ff!important;outline-offset:3px}
+.csScoreTeam img{object-fit:contain;filter:drop-shadow(0 3px 7px rgba(0,0,0,.18))}
+.csScoreStatus{letter-spacing:.065em;font-weight:800}
+.csScoreControls{gap:14px;flex-wrap:wrap}.csScoreControls input{min-width:145px}
+.reviewBackdrop{backdrop-filter:blur(9px)}.reviewPanel{border-radius:24px!important;max-height:94vh;overflow:auto}
+.boxTable{font-variant-numeric:tabular-nums}.boxTable th{position:sticky;top:0;z-index:1}
+@media(max-width:720px){.csScoreGrid{grid-template-columns:1fr!important}.csScoreControls{align-items:stretch}.reviewPanel{width:97vw!important;padding:16px!important}}
+@media(prefers-reduced-motion:reduce){.csScoreGame{transition:none!important}.csScoreGame:hover{transform:none}}
